@@ -1,25 +1,24 @@
-﻿foreach (string argument in args)
+﻿if (args.Length > 1)
 {
-    if (int.TryParse(argument, out int _))
-    {
-        Console.WriteLine($"[I]\t{argument}");
+    Console.WriteLine("Must provide just one integer.");
 
-        continue;
-    }
-
-    if (double.TryParse(argument, out double _))
-    {
-        Console.WriteLine($"[R]\t{argument}");
-
-        continue;
-    }
-
-    if (char.TryParse(argument, out char _))
-    {
-        Console.WriteLine($"[C]\t{argument}");
-
-        continue;
-    }
-
-    Console.WriteLine($"[S]\t{argument}");
+    return 1;
 }
+
+int n = 10;
+
+if (args.Length == 1 && !int.TryParse(args[0], out n))
+{
+    Console.WriteLine($"{args[0]} is not a valid integer.");
+
+    return 2;
+}
+
+Random rnd = new();
+
+for (int i = 0; i < n; i++)
+{
+    Console.WriteLine(rnd.Next(-101, 101));
+}
+
+return 0;
