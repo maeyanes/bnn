@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "bnn": {
+      "commandName": "Project",
+      "commandLineArgs": "1 1.2 tres k"
+    }
+  }
+}
