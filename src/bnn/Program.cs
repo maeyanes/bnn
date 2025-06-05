@@ -1,34 +1,78 @@
-﻿if (args.Length > 2)
+﻿if (args.Length > 4 || args.Length < 3)
 {
-    Console.WriteLine("USAGE: bnn.exe [n] [seed]");
+    Console.WriteLine("USAGE: bnn.exe INPUTS HIDDEN OUTPUTS [seed]");
 
     return 0;
 }
 
-int n = 10;
 int seed = Environment.TickCount;
 
-if (args.Length > 1 && !int.TryParse(args[0], out n))
+if (!int.TryParse(args[0], out int inputs))
 {
     Console.WriteLine($"{args[0]} is not a valid integer.");
 
     return 1;
 }
 
-if (args.Length == 2 && !int.TryParse(args[1], out seed))
+if (!int.TryParse(args[1], out int hidden))
 {
-    Console.WriteLine($"{args[1]} is not a valid seed.");
+    Console.WriteLine($"{args[1]} is not a valid integer.");
 
-    return 1;
+    return 2;
+}
+
+if (!int.TryParse(args[2], out int outputs))
+{
+    Console.WriteLine($"{args[2]} is not a valid integer.");
+
+    return 3;
+}
+
+
+if (args.Length > 3 && !int.TryParse(args[3], out seed))
+{
+    Console.WriteLine($"{args[3]} is not a valid seed.");
+
+    return 4;
 }
 
 Console.WriteLine($"Seed is {seed}");
+Console.WriteLine($"{inputs} {hidden} {outputs}");
 
 Random rnd = new(seed);
 
-for (int i = 0; i < n; i++)
+int weights = inputs + 1;
+
+for (int r = 0; r < hidden; ++r)
 {
-    Console.WriteLine(RandomWeight());
+    for (int c = 0; c < weights; ++c)
+    {
+        if (c > 0)
+        {
+            Console.Write("\t");
+        }
+
+        Console.Write($"{RandomWeight()} ");
+    }
+
+    Console.WriteLine();
+}
+
+weights = hidden + 1;
+
+for (int r = 0; r < outputs; r++)
+{
+    for (int c = 0; c < weights; c++)
+    {
+        if (c > 0)
+        {
+            Console.Write("\t");
+        }
+
+        Console.Write($"{RandomWeight()} ");
+    }
+
+    Console.WriteLine();
 }
 
 return 0;
