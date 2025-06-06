@@ -2,7 +2,7 @@
   "profiles": {
     "bnn": {
       "commandName": "Project",
-      "commandLineArgs": "3 2 1 9237464"
+      "commandLineArgs": "C:\\Users\\maeya\\source\\repos\\bnn\\data\\test_weights.txt"
     }
   }
 }
