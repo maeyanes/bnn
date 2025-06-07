@@ -27,14 +27,36 @@ internal static class InitWeightsCommand
 
     private static async Task Run(InitWeightsOptions options, IHost host)
     {
-        Console.WriteLine($"Seed: {options.Seed}");
-
         IWeightsGeneratorService weightsGenerator = host.Services.GetRequiredService<IWeightsGeneratorService>();
 
-        Weights weights = weightsGenerator.GenerateWeights(options);
+        try
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Seed: {options.Seed}");
+            Console.ResetColor();
 
-        Console.WriteLine(weights.ToString());
+            Weights weights = weightsGenerator.GenerateWeights(options);
 
-        await Task.CompletedTask;
+            Console.WriteLine("Weights generated successfully");
+
+            await using FileStream fileStream = options.OutputFile.Create();
+            await using StreamWriter writer = new(fileStream);
+
+            Console.WriteLine("Writing weights to file...");
+
+            await writer.WriteAsync(weights.ToString());
+
+            Console.WriteLine($"Weights saved to {options.OutputFile.FullName}");
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            await Console.Error.WriteLineAsync("ERROR:");
+
+            await Console.Error.WriteLineAsync($"An error occurred while generating weights: {ex.Message}");
+            Console.ResetColor();
+
+            Environment.ExitCode = 1;
+        }
     }
 }
