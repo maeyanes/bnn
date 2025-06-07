@@ -1,50 +1,35 @@
-﻿using bnn;
+﻿using System.CommandLine;
+using System.CommandLine.Builder;
+using System.CommandLine.Hosting;
+using System.CommandLine.Parsing;
+using bnn.Commands;
+using bnn.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-TextReader reader;
+await BuildCommandLine()
+      .UseHost(_ => Host.CreateDefaultBuilder(),
+               host =>
+               {
+                   host.UseConsoleLifetime()
+                       .ConfigureServices(services =>
+                                          {
+                                              services.Configure<ConsoleLifetimeOptions>(options => options.SuppressStatusMessages = true);
 
-if (Console.IsInputRedirected)
+                                              services.AddTransient<IWeightsGeneratorService, WeightsGeneratorService>();
+                                          });
+               })
+      .UseDefaults()
+      .Build()
+      .InvokeAsync(args);
+
+return;
+
+static CommandLineBuilder BuildCommandLine()
 {
-    reader = Console.In;
+    RootCommand root = new("bnn: Back Propagation Neuronal Network CLI Tools");
+
+    root.AddCommand(InitWeightsCommand.Create());
+
+    return new CommandLineBuilder(root);
 }
-else
-{
-    if (args.Length != 1)
-    {
-        Console.WriteLine("USAGE: bnn.exe WEIGHTS_FILE");
-
-        return 0;
-    }
-
-    string filename = args[0];
-
-    if (!File.Exists(filename))
-    {
-        Console.WriteLine($"ERROR: File '{filename}' does not exist.");
-
-        return 1;
-    }
-
-    reader = new StreamReader(filename);
-}
-
-BackPropagationNeuralNetwork bnn = new();
-
-if (!bnn.Get(reader))
-{
-    Console.WriteLine("ERROR: Bad neural network weights data.");
-
-    return 2;
-}
-
-bnn.Show(Console.Out);
-
-return 0;
-
-// double RandomWeight()
-// {
-//     const int randMAx = 32767;
-//     const int bias = randMAx / 2;
-//     const double div = (randMAx + 1) * 10.0;
-//
-//     return (rnd.Next(0, randMAx) - bias) / div;
-// }
