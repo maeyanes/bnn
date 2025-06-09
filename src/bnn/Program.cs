@@ -17,6 +17,7 @@ await BuildCommandLine()
                                               services.Configure<ConsoleLifetimeOptions>(options => options.SuppressStatusMessages = true);
 
                                               services.AddTransient<IWeightsGeneratorService, WeightsGeneratorService>();
+                                              services.AddTransient<INeuralNetworkTrainerService, NeuralNetworkTrainerService>();
                                           });
                })
       .UseDefaults()
@@ -30,6 +31,7 @@ static CommandLineBuilder BuildCommandLine()
     RootCommand root = new("bnn: Back Propagation Neuronal Network CLI Tools");
 
     root.AddCommand(InitWeightsCommand.Create());
+    root.AddCommand(TrainNetworkCommand.Create());
 
     return new CommandLineBuilder(root);
 }
