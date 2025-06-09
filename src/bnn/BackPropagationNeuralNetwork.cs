@@ -1,160 +1,211 @@
-﻿namespace bnn;
+﻿using System.Diagnostics.CodeAnalysis;
+using bnn.Data;
+
+namespace bnn;
 
 public sealed class BackPropagationNeuralNetwork
 {
-    private List<List<double>> _cluster0;
-    private List<List<double>> _clusterF;
-    private int _hidden;
-    private List<double> _hiddenLayer;
-    private int _inputs;
-    private int _outputs;
+    private readonly double[,] _finalCluster;
+    private readonly int _hidden;
+    private readonly double[,] _initialCluster;
+    private readonly int _inputs;
+    private readonly int _outputs;
+    private double[] _hiddenLayer;
 
     public BackPropagationNeuralNetwork(int inputs = 0, int hidden = 0, int outputs = 0)
+
     {
         _inputs = inputs;
         _hidden = hidden;
         _outputs = outputs;
 
-        _hiddenLayer = [];
-        _cluster0 = [];
-        _clusterF = [];
+        _initialCluster = new double[_hidden, _inputs + 1];
+        _finalCluster = new double[_outputs, _hidden + 1];
+        _hiddenLayer = new double[_hidden];
     }
 
-    public bool Get(TextReader reader)
+    public BackPropagationNeuralNetwork(Weights weights)
     {
-        string? line = reader.ReadLine();
+        _inputs = weights.Input;
+        _hidden = weights.Hidden;
+        _outputs = weights.Output;
 
-        if (line == null)
-        {
-            return false;
-        }
+        _initialCluster = new double[_hidden, _inputs + 1];
+        _finalCluster = new double[_outputs, _hidden + 1];
+        _hiddenLayer = new double[_hidden];
 
-        string[]? header = line.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
-
-        if (header.Length < 3)
-        {
-            return false;
-        }
-
-        if (!int.TryParse(header[0], out int inputs) || !int.TryParse(header[1], out int hidden) ||
-            !int.TryParse(header[2], out int outputs))
-        {
-            return false;
-        }
-
-        int weights = inputs + 1;
-
-        List<List<double>> cluster0 = new(weights);
-
-        for (int r = 0; r < hidden; r++)
-        {
-            List<double> neuron = ReadLineOfDoubles(reader, weights);
-
-            if (neuron.Count == 0)
-            {
-                return false;
-            }
-
-            cluster0.Add(neuron);
-        }
-
-        weights = hidden + 1;
-
-        List<List<double>> clusterF = [];
-
-        for (int r = 0; r < outputs; r++)
-        {
-            List<double> neuron = ReadLineOfDoubles(reader, weights);
-
-            if (neuron.Count == 0)
-            {
-                return false;
-            }
-
-            clusterF.Add(neuron);
-        }
-
-        _inputs = inputs;
-        _hidden = hidden;
-        _outputs = outputs;
-        _cluster0 = cluster0;
-        _clusterF = clusterF;
-
-        return true;
+        // Copiar los pesos desde el objeto Weights a las matrices internas
+        Array.Copy(weights.InitialCluster, _initialCluster, weights.InitialCluster.Length);
+        Array.Copy(weights.FinalCluster, _finalCluster, weights.FinalCluster.Length);
     }
 
-    public void Put(TextWriter writer)
+    public Func<double, double> ActivationDerivate { get; set; } = x => x * (1.0 - x);
+
+    public Func<double, double> ActivationFunction { get; set; } = x => 1.0 / (1.0 + Math.Exp(-x));
+
+    public TrainingReport BackPropagate(TrainingData trainingData,
+                                        double trainingRate,
+                                        int maxEpoch,
+                                        int seed)
     {
-        writer.WriteLine($"{_inputs} {_hidden} {_outputs}");
-
-        Show(writer);
-    }
-
-    public void Show(TextWriter writer)
-    {
-        int weights = _inputs + 1;
-
-        for (int n = 0; n < _hidden; n++)
+        if (trainingData.Inputs != _inputs || trainingData.Outputs != _outputs)
         {
-            for (int w = 0; w < weights; w++)
+            throw new ArgumentException("Input or output dimensions of the training data do not match the network configuration.");
+        }
+
+        double[] initialErrors = new double[_hidden];
+        double[] finalErrors = new double[_outputs];
+        int minMistakesPerEpoch = trainingData.Samples + 1;
+        int? epochZeroErrors = null;
+        List<WeightsSnapshot>? improvedWeights = [];
+
+        for (int epoch = 0; epoch < maxEpoch; epoch++)
+        {
+            int mistakesPerEpoch = 0;
+
+            for (int sampleIndex = 0; sampleIndex < trainingData.Samples; sampleIndex++)
             {
-                if (w > 0)
+                double[]? input = trainingData.GetInput(sampleIndex);
+                double[] outputLayer = Pass(input);
+
+                int mistakesPerOutput = CalculateOutputErrors(trainingData, sampleIndex, outputLayer, finalErrors);
+
+                if (mistakesPerOutput > 0)
                 {
-                    writer.Write('\t');
+                    mistakesPerEpoch++;
                 }
 
-                writer.Write(_cluster0[n][w]);
+                ComputeInitialErrors(finalErrors, initialErrors, outputLayer, trainingRate);
+
+                UpdateWeights(_initialCluster, input, initialErrors);
+
+                UpdateWeights(_finalCluster, _hiddenLayer, finalErrors);
             }
 
-            writer.WriteLine();
+            if (mistakesPerEpoch < minMistakesPerEpoch)
+            {
+                minMistakesPerEpoch = mistakesPerEpoch;
+
+                improvedWeights.Add(CreateSnapshotWeights(epoch, mistakesPerEpoch));
+            }
+
+            if (mistakesPerEpoch != 0 || epochZeroErrors is not null)
+            {
+                continue;
+            }
+
+            epochZeroErrors = epoch;
+
+            break;
         }
 
-        weights = _hidden + 1;
+        return new TrainingReport
+               {
+                   EpochsExecuted = epochZeroErrors.HasValue ? epochZeroErrors.Value + 1 : maxEpoch,
+                   EpochZeroErrors = epochZeroErrors,
+                   MinErrors = minMistakesPerEpoch,
+                   ImprovedWeights = improvedWeights
+               };
+    }
 
-        for (int n = 0; n < _outputs; n++)
+    private static void UpdateWeights(double[,] cluster, double[] inputs, double[] errors)
+    {
+        int rows = cluster.GetLength(0);
+        int cols = cluster.GetLength(1) - 1;
+
+        for (int r = 0; r < rows; r++)
         {
-            for (int w = 0; w < weights; w++)
+            for (int c = 0; c < cols; c++)
             {
-                if (w > 0)
-                {
-                    writer.Write('\t');
-                }
-
-                writer.Write(_clusterF[n][w]);
+                cluster[r, c] += errors[r] * inputs[c];
             }
 
-            writer.WriteLine();
+            // Actualiza el bias
+            cluster[r, cols] += errors[r];
         }
     }
 
-    private List<double> ReadLineOfDoubles(TextReader reader, int expectedCount)
+    private double Activate(double x) => ActivationFunction(x);
+
+    private double[] CalculateLayerOutput(double[] inputs, double[,] cluster)
     {
-        string? line = reader.ReadLine();
+        double[] outputs = new double[cluster.GetLength(0)];
 
-        if (line == null)
+        for (int i = 0; i < cluster.GetLength(0); i++)
         {
-            return Enumerable.Empty<double>().ToList();
+            double neuronOutput = cluster[i, inputs.Length] + inputs.Select((t, j) => t * cluster[i, j]).Sum();
+
+            outputs[i] = Activate(neuronOutput);
         }
 
-        string[] tokens = line.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        return outputs;
+    }
 
-        if (tokens.Length != expectedCount)
+    [SuppressMessage("ReSharper", "CompareOfFloatsByEqualityOperator")]
+    private int CalculateOutputErrors(TrainingData data,
+                                      int sampleIndex,
+                                      double[] outputLayer,
+                                      double[] finalErrors)
+    {
+        int mistakes = 0;
+
+        for (int i = 0; i < _outputs; i++)
         {
-            return Enumerable.Empty<double>().ToList();
-        }
-
-        List<double> result = [];
-
-        foreach (string token in tokens)
-        {
-            if (!double.TryParse(token, out double item))
+            if (double.IsNaN(outputLayer[i]) || double.IsInfinity(outputLayer[i]))
             {
-                return Enumerable.Empty<double>().ToList();
+                throw new InvalidOperationException($"Invalid output detected at neuron {i}: {outputLayer[i]}");
             }
 
-            result.Add(item);
+            finalErrors[i] = data.OutputData[sampleIndex, i] - outputLayer[i];
+
+            double result = outputLayer[i] >= 0.5 ? 1.0 : 0.0;
+
+            if (result != data.OutputData[sampleIndex, i])
+            {
+                mistakes++;
+            }
         }
 
-        return result;
+        return mistakes;
+    }
+
+    private void ComputeInitialErrors(double[] finalErrors,
+                                      double[] initialErrors,
+                                      double[] outputLayer,
+                                      double trainingRate)
+    {
+        for (int h = 0; h < _hidden; h++)
+        {
+            initialErrors[h] = 0.0;
+
+            for (int o = 0; o < _outputs; o++)
+            {
+                initialErrors[h] += finalErrors[o] * _finalCluster[o, h];
+            }
+
+            initialErrors[h] *= trainingRate * ActivationDerivate(_hiddenLayer[h]);
+        }
+
+        for (int o = 0; o < _outputs; o++)
+        {
+            finalErrors[o] *= trainingRate * ActivationDerivate(outputLayer[o]);
+        }
+    }
+
+    private WeightsSnapshot CreateSnapshotWeights(int epoch, int errors)
+    {
+        Weights snapshot = Weights.CreateEmpty(_inputs, _hidden, _outputs);
+
+        Array.Copy(_initialCluster, snapshot.InitialCluster, _initialCluster.Length);
+        Array.Copy(_finalCluster, snapshot.FinalCluster, _finalCluster.Length);
+
+        return new WeightsSnapshot(epoch, errors, snapshot);
+    }
+
+    private double[] Pass(double[] inputLayer)
+    {
+        _hiddenLayer = CalculateLayerOutput(inputLayer, _initialCluster);
+
+        return CalculateLayerOutput(_hiddenLayer, _finalCluster);
     }
 }

@@ -8,13 +8,20 @@ public class WeightsGeneratorService : IWeightsGeneratorService
     private Random? _rnd;
 
     /// <inheritdoc />
-    public Weights GenerateWeights(InitWeightsOptions options)
+    public Weights GenerateWeights(InitWeightsOptions options) =>
+        GenerateWeights(options.Input, options.Hidden, options.Output, options.Seed);
+
+    /// <inheritdoc />
+    public Weights GenerateWeights(int input,
+                                   int hidden,
+                                   int output,
+                                   int seed)
     {
-        _rnd = new Random(options.Seed);
+        _rnd = new Random(seed);
 
-        Weights weights = new(options.Input, options.Hidden, options.Output);
+        Weights weights = Weights.CreateEmpty(input, hidden, output);
 
-        GenerateCluster(weights.InitCluster);
+        GenerateCluster(weights.InitialCluster);
         GenerateCluster(weights.FinalCluster);
 
         return weights;

@@ -1,41 +1,50 @@
-﻿using System.Text;
+﻿using bnn.Serialization;
 
 namespace bnn.Data;
 
-public sealed record Weights(int Input, int Hidden, int Output)
+public sealed record Weights
 {
-    public double[,] FinalCluster { get; } = new double[Output, Hidden + 1];
+    public Weights(int input,
+                   int hidden,
+                   int output,
+                   double[,] initialCluster,
+                   double[,] finalCluster)
+    {
+        if (initialCluster.GetLength(0) != hidden || initialCluster.GetLength(1) != input + 1)
+        {
+            throw new ArgumentException("InitialCluster dimensions must be [Hidden, Input + 1]");
+        }
 
-    public double[,] InitCluster { get; } = new double[Hidden, Input + 1];
+        if (finalCluster.GetLength(0) != output || finalCluster.GetLength(1) != hidden + 1)
+        {
+            throw new ArgumentException("FinalCluster dimensions must be [Output, Hidden + 1]");
+        }
+
+        Input = input;
+        Hidden = hidden;
+        Output = output;
+
+        InitialCluster = (double[,])initialCluster.Clone();
+        FinalCluster = (double[,])finalCluster.Clone();
+    }
+
+    public double[,] FinalCluster { get; }
+
+    public int Hidden { get; }
+
+    public double[,] InitialCluster { get; }
+
+    public int Input { get; }
+
+    public int Output { get; }
+
+    public static Weights CreateEmpty(int input, int hidden, int output) =>
+        new(input,
+            hidden,
+            output,
+            new double[hidden, input + 1],
+            new double[output, hidden + 1]);
 
     /// <inheritdoc />
-    public override string ToString()
-    {
-        StringBuilder builder = new();
-
-        builder.AppendLine($"{Input} {Hidden} {Output}");
-
-        ClusterToString(builder, InitCluster);
-        ClusterToString(builder, FinalCluster);
-
-        return builder.ToString();
-    }
-
-    private static void ClusterToString(StringBuilder builder, double[,] cluster)
-    {
-        for (int r = 0; r < cluster.GetLength(0); r++)
-        {
-            for (int c = 0; c < cluster.GetLength(1); c++)
-            {
-                if (c > 0)
-                {
-                    builder.Append('\t');
-                }
-
-                builder.Append($"{cluster[r, c]}");
-            }
-
-            builder.AppendLine();
-        }
-    }
+    public override string ToString() => WeightsSerializer.Serialize(this);
 }
