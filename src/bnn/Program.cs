@@ -32,6 +32,7 @@ static CommandLineBuilder BuildCommandLine()
 
     root.AddCommand(InitWeightsCommand.Create());
     root.AddCommand(TrainNetworkCommand.Create());
+    root.AddCommand(PredictCommand.Create());
 
     return new CommandLineBuilder(root);
 }

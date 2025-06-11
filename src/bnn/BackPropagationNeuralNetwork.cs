@@ -108,6 +108,16 @@ public sealed class BackPropagationNeuralNetwork
                };
     }
 
+    public double[] Predict(double[] inputLayer)
+    {
+        if (inputLayer.Length != _inputs)
+        {
+            throw new ArgumentException($"Input layer must have {_inputs} elements, but received {inputLayer.Length}.");
+        }
+
+        return Pass(inputLayer);
+    }
+
     private static void UpdateWeights(double[,] cluster, double[] inputs, double[] errors)
     {
         int rows = cluster.GetLength(0);
