@@ -12,7 +12,7 @@ public sealed class TrainOptions
 
     public bool OutputImprovementWeights { get; set; } = false;
 
-    public string OutputPrefix { get; set; } = "W";
+    public string OutputPrefix { get; set; } = "W-";
 
     public int Seed { get; set; } = Environment.TickCount;
 

@@ -27,21 +27,25 @@ internal static class TrainNetworkCommand
                       {
                           IsRequired = false
                       });
-        cmd.AddOption(new Option<int>(["--maxEpochs", "-e"], "Maximum number of training epochs (iterations over the entire dataset).")
+        cmd.AddOption(new Option<int>(["--maxEpochs", "-e"],
+                                      "Maximum number of training epochs (iterations over the entire dataset). Defaults to 1,000,000")
                       {
                           IsRequired = false
                       });
         cmd.AddOption(new Option<double>(["--learningRate", "-l"],
-                                         "Learning rate used during training (typically a small value like 0.01).") { IsRequired = false });
-        cmd.AddOption(new Option<bool>("--outputImprovementWeights",
-                                       "If enabled, outputs the weights to a file every time the model improves.") { IsRequired = false });
+                                         "Learning rate used during training (typically a small value like 0.01). Defaults to 0.5")
+                      {
+                          IsRequired = false
+                      });
         cmd.AddOption(new Option<int>(["--seed", "-s"],
                                       "Optional random seed to initialize weights (only used if no weights file is provided).")
                       {
                           IsRequired = false
                       });
-        cmd.AddOption(new Option<string>("--prefix",
+        cmd.AddOption(new Option<string>("--outputPrefix",
                                          "Optional prefix for naming output files. If not specified, a default prefix will be used."));
+        cmd.AddOption(new Option<bool>("--outputImprovementWeights",
+                                       "If enabled, outputs the weights to a file every time the model improves.") { IsRequired = false });
 
         cmd.Handler = CommandHandler.Create<TrainOptions, IHost>(Run);
 
@@ -110,7 +114,7 @@ internal static class TrainNetworkCommand
 
             for (int o = 0; o < outputs; o++)
             {
-                int index = outputs - inputs + o;
+                int index = inputs + o;
 
                 if (!double.TryParse(values[index], out double outputValue))
                 {
