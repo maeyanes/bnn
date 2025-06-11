@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.CommandLine.NamingConventionBinder;
+using System.Text;
 using bnn.Data;
 using bnn.Extensions;
 using bnn.Options;
@@ -112,6 +113,10 @@ public static class PredictCommand
             Console.WriteLine(header);
             Console.WriteLine(separator);
 
+            bool saveOutputs = options.OutputFile is not null;
+
+            StringBuilder outputBuilder = new();
+
             for (int i = 0; i < data.Samples.GetLength(0); i++)
             {
                 double[] inputs = data.Samples.GetRow(i);
@@ -127,9 +132,25 @@ public static class PredictCommand
                     string binOutputStr = string.Join(" ", outputs.Select(v => v >= 0.5 ? "1" : "0"));
 
                     line += $" | {binOutputStr}";
+
+                    outputs = outputs.Select(v => v >= 0.5 ? 1.0 : 0.0).ToArray();
+                }
+
+                if (saveOutputs)
+                {
+                    outputBuilder.AppendJoin(" ", outputs);
+                    outputBuilder.AppendLine();
                 }
 
                 Console.WriteLine(line);
+            }
+
+            if (saveOutputs)
+            {
+                await using FileStream fileStream = options.OutputFile!.Create();
+                await using StreamWriter textWriter = new(fileStream);
+
+                await textWriter.WriteLineAsync(outputBuilder.ToString().Trim());
             }
         }
         catch (Exception ex)

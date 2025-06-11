@@ -2,7 +2,7 @@
   "profiles": {
     "bnn": {
       "commandName": "Project",
-      "commandLineArgs": "init-weights -i 2 -h 3 -o 4 --outputFile C:\\Users\\maeya\\source\\repos\\bnn\\data\\test.txt"
+      "commandLineArgs": "predict -d ..\\..\\..\\data\\four\\input.txt -w ..\\..\\..\\data\\four\\W000015-1260-0.txt -o ..\\..\\..\\data\\four\\result.txt"
     }
   }
 }
