@@ -2,6 +2,8 @@
 
 public sealed class PredictOptions
 {
+    public string Activation { get; set; } = "sigmoid";
+
     public bool BinarizeOutput { get; set; } = false;
 
     public FileInfo DataFile { get; set; } = default!;

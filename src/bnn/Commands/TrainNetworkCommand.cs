@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.CommandLine.NamingConventionBinder;
+using bnn.Activation;
 using bnn.Data;
 using bnn.Options;
 using bnn.Serialization;
@@ -42,10 +43,33 @@ internal static class TrainNetworkCommand
                       {
                           IsRequired = false
                       });
+
+        Option<string> activationOption = new(["--activation", "-a"],
+                                              "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")
+                                          {
+                                              IsRequired = false
+                                          };
+        activationOption.SetDefaultValue("sigmoid");
+        activationOption.AddValidator(result =>
+                                      {
+                                          string? value = result.GetValueOrDefault<string>()?.ToLowerInvariant();
+
+                                          if (value is not ("sigmoid" or "relu" or "tanh"))
+                                          {
+                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh.";
+                                          }
+                                      });
+
+        cmd.AddOption(activationOption);
+
+
         cmd.AddOption(new Option<string>("--outputPrefix",
                                          "Optional prefix for naming output files. If not specified, a default prefix will be used."));
-        cmd.AddOption(new Option<bool>("--outputImprovementWeights",
-                                       "If enabled, outputs the weights to a file every time the model improves.") { IsRequired = false });
+        cmd.AddOption(new Option<bool>("--disableImprovementWeights",
+                                       "Disables saving the weights to a file whenever the network improves during training.")
+                      {
+                          IsRequired = false
+                      });
 
         cmd.Handler = CommandHandler.Create<TrainOptions, IHost>(Run);
 
@@ -158,9 +182,23 @@ internal static class TrainNetworkCommand
 
             Console.WriteLine();
 
+            (Func<double, double> activation, Func<double, double> activationDerivative) = options.Activation.ToLowerInvariant() switch
+                                                                                           {
+                                                                                               "sigmoid" => ActivationFunctions.Sigmoid,
+                                                                                               "relu" => ActivationFunctions.ReLu,
+                                                                                               "tanh" => ActivationFunctions.Tanh,
+                                                                                               { } unknown =>
+                                                                                                   throw new
+                                                                                                       ArgumentException($"Unsupported activation function: {unknown}")
+                                                                                           };
+
             INeuralNetworkTrainerService trainer = host.Services.GetRequiredService<INeuralNetworkTrainerService>();
 
-            TrainingReport trainingReport = await trainer.TrainAsync(options, trainingData, initialWeights);
+            TrainingReport trainingReport = await trainer.TrainAsync(options,
+                                                                     trainingData,
+                                                                     initialWeights,
+                                                                     activation,
+                                                                     activationDerivative);
 
             Console.WriteLine();
 

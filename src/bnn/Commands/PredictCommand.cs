@@ -1,6 +1,7 @@
 ﻿using System.CommandLine;
 using System.CommandLine.NamingConventionBinder;
 using System.Text;
+using bnn.Activation;
 using bnn.Data;
 using bnn.Extensions;
 using bnn.Options;
@@ -30,6 +31,25 @@ public static class PredictCommand
                                             "Optional file path to save the prediction results in plain text format."));
         cmd.AddOption(new Option<bool>("--binarizeOutput",
                                        "If enabled, predicted output values will be binarized using a fixed threshold of 0.5. Outputs >= 0.5 will be set to 1, otherwise 0."));
+
+        Option<string> activationOption = new(["--activation", "-a"],
+                                              "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")
+                                          {
+                                              IsRequired = false
+                                          };
+
+        activationOption.SetDefaultValue("sigmoid");
+        activationOption.AddValidator(result =>
+                                      {
+                                          string? value = result.GetValueOrDefault<string>()?.ToLowerInvariant();
+
+                                          if (value is not ("sigmoid" or "relu" or "tanh"))
+                                          {
+                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh.";
+                                          }
+                                      });
+
+        cmd.AddOption(activationOption);
 
         cmd.Handler = CommandHandler.Create<PredictOptions, IHost>(Run);
 
@@ -102,6 +122,18 @@ public static class PredictCommand
             Weights weights = WeightsSerializer.DeserializeFromFile(options.WeightsFile);
 
             BackPropagationNeuralNetwork network = new(weights);
+
+            (Func<double, double> activation, Func<double, double> activationDerivative) = options.Activation.ToLowerInvariant() switch
+                                                                                           {
+                                                                                               "sigmoid" => ActivationFunctions.Sigmoid,
+                                                                                               "relu" => ActivationFunctions.ReLu,
+                                                                                               "tanh" => ActivationFunctions.Tanh,
+                                                                                               { } unknown =>
+                                                                                                   throw new
+                                                                                                       ArgumentException($"Unsupported activation function: {unknown}")
+                                                                                           };
+
+            network.SetActivationFunction(activation, activationDerivative);
 
             Console.WriteLine();
             ConsoleOutput.PrintInfo("Generating predictions...");

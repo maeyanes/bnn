@@ -8,9 +8,13 @@ internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
     public async Task<TrainingReport> TrainAsync(TrainOptions options,
                                                  TrainingData trainingData,
                                                  Weights initialWeights,
+                                                 Func<double, double> activation,
+                                                 Func<double, double> activationDerivative,
                                                  CancellationToken cancellationToken = default)
     {
         BackPropagationNeuralNetwork network = new(initialWeights);
+
+        network.SetActivationFunction(activation, activationDerivative);
 
         TrainingReport trainingReport = network.BackPropagate(trainingData, options.LearningRate, options.MaxEpochs, options.Seed);
 
@@ -24,7 +28,7 @@ internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
 
             Console.WriteLine($"{snapshot.Errors} errors at epoch {snapshot.Epoch:N0}");
 
-            if (!options.OutputImprovementWeights)
+            if (options.DisableImprovementWeights)
             {
                 continue;
             }

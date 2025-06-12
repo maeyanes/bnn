@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using bnn.Activation;
 using bnn.Data;
 
 namespace bnn;
@@ -10,6 +11,8 @@ public sealed class BackPropagationNeuralNetwork
     private readonly double[,] _initialCluster;
     private readonly int _inputs;
     private readonly int _outputs;
+    private Func<double, double> _activationDerivative;
+    private Func<double, double> _activationFunction;
     private double[] _hiddenLayer;
 
     public BackPropagationNeuralNetwork(int inputs = 0, int hidden = 0, int outputs = 0)
@@ -22,26 +25,19 @@ public sealed class BackPropagationNeuralNetwork
         _initialCluster = new double[_hidden, _inputs + 1];
         _finalCluster = new double[_outputs, _hidden + 1];
         _hiddenLayer = new double[_hidden];
+
+        (Func<double, double> activation, Func<double, double> activationDerivative) = ActivationFunctions.Sigmoid;
+
+        _activationFunction = activation;
+        _activationDerivative = activationDerivative;
     }
 
-    public BackPropagationNeuralNetwork(Weights weights)
+    public BackPropagationNeuralNetwork(Weights weights) : this(weights.Input, weights.Hidden, weights.Output)
     {
-        _inputs = weights.Input;
-        _hidden = weights.Hidden;
-        _outputs = weights.Output;
-
-        _initialCluster = new double[_hidden, _inputs + 1];
-        _finalCluster = new double[_outputs, _hidden + 1];
-        _hiddenLayer = new double[_hidden];
-
         // Copiar los pesos desde el objeto Weights a las matrices internas
         Array.Copy(weights.InitialCluster, _initialCluster, weights.InitialCluster.Length);
         Array.Copy(weights.FinalCluster, _finalCluster, weights.FinalCluster.Length);
     }
-
-    public Func<double, double> ActivationDerivate { get; set; } = x => x * (1.0 - x);
-
-    public Func<double, double> ActivationFunction { get; set; } = x => 1.0 / (1.0 + Math.Exp(-x));
 
     public TrainingReport BackPropagate(TrainingData trainingData,
                                         double trainingRate,
@@ -118,6 +114,12 @@ public sealed class BackPropagationNeuralNetwork
         return Pass(inputLayer);
     }
 
+    public void SetActivationFunction(Func<double, double> activation, Func<double, double> activationDerivative)
+    {
+        _activationFunction = activation;
+        _activationDerivative = activationDerivative;
+    }
+
     private static void UpdateWeights(double[,] cluster, double[] inputs, double[] errors)
     {
         int rows = cluster.GetLength(0);
@@ -135,7 +137,7 @@ public sealed class BackPropagationNeuralNetwork
         }
     }
 
-    private double Activate(double x) => ActivationFunction(x);
+    private double Activate(double x) => _activationFunction(x);
 
     private double[] CalculateLayerOutput(double[] inputs, double[,] cluster)
     {
@@ -193,12 +195,12 @@ public sealed class BackPropagationNeuralNetwork
                 initialErrors[h] += finalErrors[o] * _finalCluster[o, h];
             }
 
-            initialErrors[h] *= trainingRate * ActivationDerivate(_hiddenLayer[h]);
+            initialErrors[h] *= trainingRate * _activationDerivative(_hiddenLayer[h]);
         }
 
         for (int o = 0; o < _outputs; o++)
         {
-            finalErrors[o] *= trainingRate * ActivationDerivate(outputLayer[o]);
+            finalErrors[o] *= trainingRate * _activationDerivative(outputLayer[o]);
         }
     }
 
