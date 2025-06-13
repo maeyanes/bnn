@@ -110,9 +110,6 @@ public static class PredictCommand
 
     private static async Task Run(PredictOptions options, IHost host)
     {
-        const string defaultHeader = "  #  | Inputs             | Raw Outputs                       ";
-        const string defaultSeparator = "-----+--------------------+-----------------------------------";
-
         try
         {
             ConsoleOutput.PrintInfo("Loading data and weights...");
@@ -139,14 +136,11 @@ public static class PredictCommand
             ConsoleOutput.PrintInfo("Generating predictions...");
             Console.WriteLine();
 
-            string header = options.BinarizeOutput ? $"{defaultHeader}| Binarized Output" : defaultHeader;
-            string separator = $"{defaultSeparator}{(options.BinarizeOutput ? "+----------------------" : string.Empty)}";
-
-            Console.WriteLine(header);
-            Console.WriteLine(separator);
-
             bool saveOutputs = options.OutputFile is not null;
 
+            List<string[]> rawOutputs = new();
+            List<string[]> binarizedOutputs = new();
+            List<string[]> inputStrings = new();
             StringBuilder outputBuilder = new();
 
             for (int i = 0; i < data.Samples.GetLength(0); i++)
@@ -154,24 +148,62 @@ public static class PredictCommand
                 double[] inputs = data.Samples.GetRow(i);
                 double[] outputs = network.Predict(inputs);
 
-                string inputStr = string.Join(" ", inputs.Select(v => v.ToString("0.###")));
-                string outputStr = string.Join(" ", outputs.Select(v => v.ToString("0.##0")));
-
-                string line = $"{i + 1,4} | {inputStr,-18} | {outputStr,-33}";
+                inputStrings.Add(inputs.Select(v => v.ToString("0.##0")).ToArray());
+                rawOutputs.Add(outputs.Select(v => v.ToString("0.##0")).ToArray());
 
                 if (options.BinarizeOutput)
                 {
-                    string binOutputStr = string.Join(" ", outputs.Select(v => v >= 0.5 ? "1" : "0"));
-
-                    line += $" | {binOutputStr}";
+                    binarizedOutputs.Add(outputs.Select(v => v >= 0.5 ? "1" : "0").ToArray());
 
                     outputs = outputs.Select(v => v >= 0.5 ? 1.0 : 0.0).ToArray();
                 }
 
-                if (saveOutputs)
+                if (!saveOutputs)
                 {
-                    outputBuilder.AppendJoin(" ", outputs);
-                    outputBuilder.AppendLine();
+                    continue;
+                }
+
+                outputBuilder.AppendJoin(" ", outputs);
+                outputBuilder.AppendLine();
+            }
+
+            // Calcular anchos máximos por sección
+            int inputWidth = inputStrings.Max(arr => string.Join(" ", arr).Length);
+            int outputWidth = rawOutputs.Max(arr => string.Join(" ", arr).Length);
+            int binarizedWidth = options.BinarizeOutput ? binarizedOutputs.Max(arr => string.Join(" ", arr).Length) : 0;
+
+            // Crear encabezados dinámicamente
+            string header = $"  #  | {"Inputs".PadRight(inputWidth)} | {"Raw Outputs".PadRight(outputWidth)}";
+            string separator = $"-----+{new string('-', inputWidth + 2)}+{new string('-', outputWidth + 2)}";
+
+            if (options.BinarizeOutput)
+            {
+                header += $" | {"Binarized Output".PadRight(binarizedWidth)}";
+                separator += "+-----------------";
+            }
+
+            Console.WriteLine(header);
+            Console.WriteLine(separator);
+
+            // Imprimir resultados
+            for (int i = 0; i < inputStrings.Count; i++)
+            {
+                int[] perOutputWidths = Enumerable.Range(0, inputStrings[0].Length)
+                                                  .Select(col => inputStrings.Max(row => row[col].Length))
+                                                  .ToArray();
+
+                string inputStr = string.Join(" ", inputStrings[i].Select((val, idx) => val.PadLeft(perOutputWidths[idx])));
+
+                perOutputWidths = Enumerable.Range(0, rawOutputs[0].Length).Select(col => rawOutputs.Max(row => row[col].Length)).ToArray();
+
+                string outputStr = string.Join(" ", rawOutputs[i].Select((val, idx) => val.PadLeft(perOutputWidths[idx])));
+
+                string line = $"{i + 1,4} | {inputStr.PadRight(inputWidth)} | {outputStr}";
+
+                if (options.BinarizeOutput)
+                {
+                    string binStr = string.Join(" ", binarizedOutputs[i]);
+                    line += $" | {binStr.PadRight(binarizedWidth)}";
                 }
 
                 Console.WriteLine(line);
