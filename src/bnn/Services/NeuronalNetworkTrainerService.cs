@@ -5,6 +5,8 @@ namespace bnn.Services;
 
 internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
 {
+    private readonly string _currentDirectory = Directory.GetCurrentDirectory();
+
     public async Task<TrainingReport> TrainAsync(TrainOptions options,
                                                  TrainingData trainingData,
                                                  Weights initialWeights,
@@ -20,6 +22,8 @@ internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
 
         int indexWidth = (int)Math.Ceiling(Math.Log10(options.MaxEpochs));
 
+        OutputSettingsFile(options, indexWidth);
+
         for (int i = 0; i < trainingReport.ImprovedWeights.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -33,9 +37,9 @@ internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
                 continue;
             }
 
-            string filename = $"{options.OutputPrefix}{i.ToString().PadLeft(indexWidth, '0')}-{snapshot.Epoch}-{snapshot.Errors}.txt";
+            string filename = $"{options.OutputPrefix}{(i + 1).ToString().PadLeft(indexWidth, '0')}-{snapshot.Epoch}-{snapshot.Errors}.txt";
 
-            FileInfo snapshotFile = new(Path.Combine(options.DataFile.DirectoryName!, filename));
+            FileInfo snapshotFile = new(Path.Combine(_currentDirectory, filename));
 
             await using FileStream fileStream = snapshotFile.Create();
             await using StreamWriter writer = new(fileStream);
@@ -45,5 +49,27 @@ internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
         Console.WriteLine();
 
         return trainingReport;
+    }
+
+    private void OutputSettingsFile(TrainOptions options, int indexWidth)
+    {
+        if (options.DisableImprovementWeights)
+        {
+            return;
+        }
+
+        string filename = $"{options.OutputPrefix}{0.ToString().PadLeft(indexWidth, '0')}-parameters.txt";
+
+        FileInfo fileInfo = new(Path.Combine(_currentDirectory, filename));
+
+        using FileStream fileStream = fileInfo.Create();
+        using StreamWriter writer = new(fileStream);
+
+        writer.WriteLine(options.WeightsFile is null ? $"Seed={options.Seed}" : $"WeightsFile={options.WeightsFile.FullName}");
+
+        writer.WriteLine($"Hidden={options.Hidden}");
+        writer.WriteLine($"LearningRate={options.LearningRate}");
+        writer.WriteLine($"MaxEpochs={options.MaxEpochs}");
+        writer.WriteLine($"Activation={options.Activation}");
     }
 }

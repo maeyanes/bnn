@@ -157,7 +157,7 @@ internal static class TrainNetworkCommand
     {
         try
         {
-            ConsoleOutput.PrintInfo($"Training with a max of {options.MaxEpochs:N0} epochs at learning rate {options.LearningRate}");
+            ConsoleOutput.PrintInfo($"Training with a max of {options.MaxEpochs:N0} epochs at learning rate {options.LearningRate}, {options.Hidden} hidden outputs and {options.Activation} activation...");
 
             TrainingData trainingData = LoadTrainingData(options.DataFile);
 
