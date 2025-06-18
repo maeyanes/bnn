@@ -19,4 +19,6 @@ public sealed class TrainOptions
     public int Seed { get; set; } = Environment.TickCount;
 
     public FileInfo WeightsFile { get; set; } = default!;
+
+    public bool UseGpu { get; set; } = false;
 }

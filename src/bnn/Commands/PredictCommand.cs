@@ -31,6 +31,7 @@ public static class PredictCommand
                                             "Optional file path to save the prediction results in plain text format."));
         cmd.AddOption(new Option<bool>("--binarizeOutput",
                                        "If enabled, predicted output values will be binarized using a fixed threshold of 0.5. Outputs >= 0.5 will be set to 1, otherwise 0."));
+        cmd.AddOption(new Option<bool>("--useGpu", "Use GPU acceleration for prediction if available."));
 
         Option<string> activationOption = new(["--activation", "-a"],
                                               "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")

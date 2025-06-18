@@ -43,6 +43,7 @@ internal static class TrainNetworkCommand
                       {
                           IsRequired = false
                       });
+        cmd.AddOption(new Option<bool>("--useGpu", "Use GPU acceleration for training if available."));
 
         Option<string> activationOption = new(["--activation", "-a"],
                                               "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")

@@ -11,4 +11,6 @@ public sealed class PredictOptions
     public FileInfo? OutputFile { get; init; }
 
     public FileInfo WeightsFile { get; set; } = default!;
+
+    public bool UseGpu { get; set; } = false;
 }
