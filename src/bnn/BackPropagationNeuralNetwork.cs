@@ -15,6 +15,7 @@ public sealed class BackPropagationNeuralNetwork
     private readonly bool _useGpu;
     private Func<double, double> _activationDerivative;
     private Func<double, double> _activationFunction;
+    private ActivationKind _activationKind;
     private double[] _hiddenLayer;
 
     public BackPropagationNeuralNetwork(int inputs = 0,
@@ -36,6 +37,7 @@ public sealed class BackPropagationNeuralNetwork
 
         _activationFunction = activation;
         _activationDerivative = activationDerivative;
+        _activationKind = ActivationKind.Sigmoid;
     }
 
     public BackPropagationNeuralNetwork(Weights weights, bool useGpu = false) : this(weights.Input, weights.Hidden, weights.Output, useGpu)
@@ -85,7 +87,7 @@ public sealed class BackPropagationNeuralNetwork
                                                                initialErrors,
                                                                outputLayer,
                                                                trainingRate,
-                                                               _activationDerivative);
+                                                               _activationKind);
 
                     GpuBackpropagation.UpdateWeightsGpu(_initialCluster, input, initialErrors);
 
@@ -137,10 +139,13 @@ public sealed class BackPropagationNeuralNetwork
         return Pass(inputLayer);
     }
 
-    public void SetActivationFunction(Func<double, double> activation, Func<double, double> activationDerivative)
+    public void SetActivationFunction(Func<double, double> activation,
+                                      Func<double, double> activationDerivative,
+                                      ActivationKind activationKind)
     {
         _activationFunction = activation;
         _activationDerivative = activationDerivative;
+        _activationKind = activationKind;
     }
 
     private static void UpdateWeights(double[,] cluster, double[] inputs, double[] errors)
@@ -166,7 +171,7 @@ public sealed class BackPropagationNeuralNetwork
     {
         if (_useGpu)
         {
-            return GpuBackpropagation.CalculateLayerOutputGpu(inputs, cluster, _activationFunction);
+            return GpuBackpropagation.CalculateLayerOutputGpu(inputs, cluster, _activationKind);
         }
 
         double[] outputs = new double[cluster.GetLength(0)];
