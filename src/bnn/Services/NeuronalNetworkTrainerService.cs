@@ -1,5 +1,6 @@
 ﻿using bnn.Data;
 using bnn.Options;
+using bnn.Gpu;
 
 namespace bnn.Services;
 
@@ -12,11 +13,12 @@ internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
                                                  Weights initialWeights,
                                                  Func<double, double> activation,
                                                  Func<double, double> activationDerivative,
+                                                 ActivationKind activationKind,
                                                  CancellationToken cancellationToken = default)
     {
         BackPropagationNeuralNetwork network = new(initialWeights, options.UseGpu);
 
-        network.SetActivationFunction(activation, activationDerivative);
+        network.SetActivationFunction(activation, activationDerivative, activationKind);
 
         TrainingReport trainingReport = network.BackPropagate(trainingData, options.LearningRate, options.MaxEpochs, options.Seed);
 

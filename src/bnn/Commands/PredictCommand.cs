@@ -4,6 +4,7 @@ using System.Text;
 using bnn.Activation;
 using bnn.Data;
 using bnn.Extensions;
+using bnn.Gpu;
 using bnn.Options;
 using bnn.Serialization;
 using bnn.Utils;
@@ -123,7 +124,7 @@ public static class PredictCommand
             BackPropagationNeuralNetwork network = new(weights, options.UseGpu);
 
             (Func<double, double> activation, Func<double, double> activationDerivative) = options.Activation.ToLowerInvariant() switch
-                                                                                           {
+           {
                                                                                                "sigmoid" => ActivationFunctions.Sigmoid,
                                                                                                "relu" => ActivationFunctions.ReLu,
                                                                                                "tanh" => ActivationFunctions.Tanh,
@@ -133,9 +134,10 @@ public static class PredictCommand
                                                                                                { } unknown =>
                                                                                                    throw new
                                                                                                        ArgumentException($"Unsupported activation function: {unknown}")
-                                                                                           };
+           };
+            ActivationKind kind = ActivationFunctionsGpu.ParseKind(options.Activation);
 
-            network.SetActivationFunction(activation, activationDerivative);
+            network.SetActivationFunction(activation, activationDerivative, kind);
 
             Console.WriteLine();
             ConsoleOutput.PrintInfo("Generating predictions...");

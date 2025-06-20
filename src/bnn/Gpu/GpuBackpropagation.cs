@@ -4,7 +4,7 @@ namespace bnn.Gpu;
 
 public static class GpuBackpropagation
 {
-    public static double[] CalculateLayerOutputGpu(double[] inputs, double[,] weights, Func<double, double> activation)
+    public static double[] CalculateLayerOutputGpu(double[] inputs, double[,] weights, ActivationKind activation)
     {
         int outputSize = weights.GetLength(0);
         int inputSize = inputs.Length;
@@ -27,9 +27,11 @@ public static class GpuBackpropagation
                         inputSize,
                         stride));
 
+        ActivationFunctionsGpu.ApplyActivation(outputBuffer, outputSize, activation);
+
         float[] output = outputBuffer.ToArray();
 
-        return output.Select(x => activation(x)).ToArray();
+        return Array.ConvertAll(output, x => (double)x);
     }
 
     public static void ComputeInitialErrorsGpu(double[,] finalCluster,
@@ -38,26 +40,51 @@ public static class GpuBackpropagation
                                                double[] initialErrors,
                                                double[] outputLayer,
                                                double trainingRate,
-                                               Func<double, double> activationDerivative)
+                                               ActivationKind activation)
     {
         int hidden = hiddenLayer.Length;
         int outputs = finalErrors.Length;
 
-        Parallel.For(0,
-                     hidden,
-                     h =>
-                     {
-                         double sum = 0;
+        float[] clusterData = finalCluster.Cast<double>().Select(x => (float)x).ToArray();
+        float[] finalErrorsData = Array.ConvertAll(finalErrors, x => (float)x);
+        float[] hiddenDerivatives = ActivationFunctionsGpu.Derivative(Array.ConvertAll(hiddenLayer, x => (float)x), activation);
+        float[] outputDerivatives = ActivationFunctionsGpu.Derivative(Array.ConvertAll(outputLayer, x => (float)x), activation);
 
-                         for (int o = 0; o < outputs; o++)
-                         {
-                             sum += finalErrors[o] * finalCluster[o, h];
-                         }
+        using ReadOnlyBuffer<float> clusterBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(clusterData);
+        using ReadWriteBuffer<float> finalErrorsBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(finalErrorsData);
+        using ReadOnlyBuffer<float> hiddenDerBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(hiddenDerivatives);
+        using ReadWriteBuffer<float> initialErrorsBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<float>(hidden);
 
-                         initialErrors[h] = sum * trainingRate * activationDerivative(hiddenLayer[h]);
-                     });
+        int stride = finalCluster.GetLength(1);
 
-        Parallel.For(0, outputs, o => { finalErrors[o] *= trainingRate * activationDerivative(outputLayer[o]); });
+        GraphicsDevice.GetDefault().For(hidden,
+                                        new InitialErrorsKernel(clusterBuffer,
+                                                               finalErrorsBuffer,
+                                                               hiddenDerBuffer,
+                                                               initialErrorsBuffer,
+                                                               (float)trainingRate,
+                                                               outputs,
+                                                               stride));
+
+        using ReadOnlyBuffer<float> outputDerBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(outputDerivatives);
+
+        GraphicsDevice.GetDefault().For(outputs,
+                                        new FinalErrorsKernel(finalErrorsBuffer,
+                                                              outputDerBuffer,
+                                                              (float)trainingRate));
+
+        float[] initialGpu = initialErrorsBuffer.ToArray();
+        float[] finalGpu = finalErrorsBuffer.ToArray();
+
+        for (int i = 0; i < hidden; i++)
+        {
+            initialErrors[i] = initialGpu[i];
+        }
+
+        for (int i = 0; i < outputs; i++)
+        {
+            finalErrors[i] = finalGpu[i];
+        }
     }
 
     public static void UpdateWeightsGpu(double[,] cluster, double[] inputs, double[] errors)
@@ -65,16 +92,30 @@ public static class GpuBackpropagation
         int rows = cluster.GetLength(0);
         int cols = cluster.GetLength(1);
 
-        Parallel.For(0,
-                     rows,
-                     r =>
-                     {
-                         for (int c = 0; c < cols - 1; c++)
-                         {
-                             cluster[r, c] += errors[r] * inputs[c];
-                         }
+        float[] clusterData = cluster.Cast<double>().Select(x => (float)x).ToArray();
+        float[] inputData = Array.ConvertAll(inputs, x => (float)x);
+        float[] errorData = Array.ConvertAll(errors, x => (float)x);
 
-                         cluster[r, cols - 1] += errors[r];
-                     });
+        using ReadWriteBuffer<float> clusterBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(clusterData);
+        using ReadOnlyBuffer<float> inputBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(inputData);
+        using ReadOnlyBuffer<float> errorBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(errorData);
+
+        GraphicsDevice.GetDefault().For(rows,
+                                        new UpdateWeightsKernel(clusterBuffer,
+                                                               inputBuffer,
+                                                               errorBuffer,
+                                                               cols - 1,
+                                                               cols));
+
+        float[] updated = clusterBuffer.ToArray();
+        int index = 0;
+
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                cluster[r, c] = updated[index++];
+            }
+        }
     }
 }

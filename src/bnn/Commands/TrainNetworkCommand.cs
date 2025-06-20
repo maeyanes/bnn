@@ -2,6 +2,7 @@
 using System.CommandLine.NamingConventionBinder;
 using bnn.Activation;
 using bnn.Data;
+using bnn.Gpu;
 using bnn.Options;
 using bnn.Serialization;
 using bnn.Services;
@@ -198,11 +199,14 @@ internal static class TrainNetworkCommand
 
             INeuralNetworkTrainerService trainer = host.Services.GetRequiredService<INeuralNetworkTrainerService>();
 
+            ActivationKind kind = ActivationFunctionsGpu.ParseKind(options.Activation);
+
             TrainingReport trainingReport = await trainer.TrainAsync(options,
                                                                      trainingData,
                                                                      initialWeights,
                                                                      activation,
-                                                                     activationDerivative);
+                                                                     activationDerivative,
+                                                                     kind);
 
             Console.WriteLine();
 
