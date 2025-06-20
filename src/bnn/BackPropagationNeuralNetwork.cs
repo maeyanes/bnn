@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using bnn.Activation;
 using bnn.Data;
+using bnn.Gpu;
 
 namespace bnn;
 
@@ -11,16 +12,21 @@ public sealed class BackPropagationNeuralNetwork
     private readonly double[,] _initialCluster;
     private readonly int _inputs;
     private readonly int _outputs;
+    private readonly bool _useGpu;
     private Func<double, double> _activationDerivative;
     private Func<double, double> _activationFunction;
     private double[] _hiddenLayer;
 
-    public BackPropagationNeuralNetwork(int inputs = 0, int hidden = 0, int outputs = 0)
+    public BackPropagationNeuralNetwork(int inputs = 0,
+                                        int hidden = 0,
+                                        int outputs = 0,
+                                        bool useGpu = false)
 
     {
         _inputs = inputs;
         _hidden = hidden;
         _outputs = outputs;
+        _useGpu = useGpu;
 
         _initialCluster = new double[_hidden, _inputs + 1];
         _finalCluster = new double[_outputs, _hidden + 1];
@@ -32,7 +38,7 @@ public sealed class BackPropagationNeuralNetwork
         _activationDerivative = activationDerivative;
     }
 
-    public BackPropagationNeuralNetwork(Weights weights) : this(weights.Input, weights.Hidden, weights.Output)
+    public BackPropagationNeuralNetwork(Weights weights, bool useGpu = false) : this(weights.Input, weights.Hidden, weights.Output, useGpu)
     {
         // Copiar los pesos desde el objeto Weights a las matrices internas
         Array.Copy(weights.InitialCluster, _initialCluster, weights.InitialCluster.Length);
@@ -71,11 +77,28 @@ public sealed class BackPropagationNeuralNetwork
                     mistakesPerEpoch++;
                 }
 
-                ComputeInitialErrors(finalErrors, initialErrors, outputLayer, trainingRate);
+                if (_useGpu)
+                {
+                    GpuBackpropagation.ComputeInitialErrorsGpu(_finalCluster,
+                                                               finalErrors,
+                                                               _hiddenLayer,
+                                                               initialErrors,
+                                                               outputLayer,
+                                                               trainingRate,
+                                                               _activationDerivative);
 
-                UpdateWeights(_initialCluster, input, initialErrors);
+                    GpuBackpropagation.UpdateWeightsGpu(_initialCluster, input, initialErrors);
 
-                UpdateWeights(_finalCluster, _hiddenLayer, finalErrors);
+                    GpuBackpropagation.UpdateWeightsGpu(_finalCluster, _hiddenLayer, finalErrors);
+                }
+                else
+                {
+                    ComputeInitialErrors(finalErrors, initialErrors, outputLayer, trainingRate);
+
+                    UpdateWeights(_initialCluster, input, initialErrors);
+
+                    UpdateWeights(_finalCluster, _hiddenLayer, finalErrors);
+                }
             }
 
             if (mistakesPerEpoch < minMistakesPerEpoch)
@@ -141,6 +164,11 @@ public sealed class BackPropagationNeuralNetwork
 
     private double[] CalculateLayerOutput(double[] inputs, double[,] cluster)
     {
+        if (_useGpu)
+        {
+            return GpuBackpropagation.CalculateLayerOutputGpu(inputs, cluster, _activationFunction);
+        }
+
         double[] outputs = new double[cluster.GetLength(0)];
 
         for (int i = 0; i < cluster.GetLength(0); i++)

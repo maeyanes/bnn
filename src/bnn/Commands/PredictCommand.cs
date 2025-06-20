@@ -31,7 +31,6 @@ public static class PredictCommand
                                             "Optional file path to save the prediction results in plain text format."));
         cmd.AddOption(new Option<bool>("--binarizeOutput",
                                        "If enabled, predicted output values will be binarized using a fixed threshold of 0.5. Outputs >= 0.5 will be set to 1, otherwise 0."));
-        cmd.AddOption(new Option<bool>("--useGpu", "Use GPU acceleration for prediction if available."));
 
         Option<string> activationOption = new(["--activation", "-a"],
                                               "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")
@@ -44,13 +43,15 @@ public static class PredictCommand
                                       {
                                           string? value = result.GetValueOrDefault<string>()?.ToLowerInvariant();
 
-                                          if (value is not ("sigmoid" or "relu" or "tanh"))
+                                          if (value is not ("sigmoid" or "relu" or "tanh" or "signedroot" or "cuberoot"))
                                           {
-                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh.";
+                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh, signedRoot, cubeRoot.";
                                           }
                                       });
 
         cmd.AddOption(activationOption);
+
+        cmd.AddOption(new Option<bool>("--useGpu", "Use GPU acceleration for prediction if available."));
 
         cmd.Handler = CommandHandler.Create<PredictOptions, IHost>(Run);
 
@@ -119,13 +120,16 @@ public static class PredictCommand
 
             Weights weights = WeightsSerializer.DeserializeFromFile(options.WeightsFile);
 
-            BackPropagationNeuralNetwork network = new(weights);
+            BackPropagationNeuralNetwork network = new(weights, options.UseGpu);
 
             (Func<double, double> activation, Func<double, double> activationDerivative) = options.Activation.ToLowerInvariant() switch
                                                                                            {
                                                                                                "sigmoid" => ActivationFunctions.Sigmoid,
                                                                                                "relu" => ActivationFunctions.ReLu,
                                                                                                "tanh" => ActivationFunctions.Tanh,
+                                                                                               "cuberoot" => ActivationFunctions.CubeRoot,
+                                                                                               "signedroot" => ActivationFunctions
+                                                                                                   .SignedRoot,
                                                                                                { } unknown =>
                                                                                                    throw new
                                                                                                        ArgumentException($"Unsupported activation function: {unknown}")

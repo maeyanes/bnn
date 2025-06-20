@@ -4,7 +4,7 @@
     <ProjectName Condition="'$(ProjectName)'==''">$(MSBuildProjectName)</ProjectName>
     <Configuration Condition="'$(Configuration)'==''">Debug</Configuration>
     <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory.TrimEnd('\').TrimEnd('/'))</SolutionDir>
-    <ArtifactsDir>$(SolutionDir)\artifacts</ArtifactsDir>
+    <ArtifactsDir>$(SolutionDir)\artefactos</ArtifactsDir>
     <OutputPath>$([System.IO.Path]::GetFullPath('$(ArtifactsDir)\bin\$(Configuration)'))</OutputPath>
     <BaseIntermediateOutputPath>$([System.IO.Path]::GetFullPath('$(ArtifactsDir)\obj\$(ProjectName)'))</BaseIntermediateOutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

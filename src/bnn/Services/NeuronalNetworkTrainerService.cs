@@ -14,7 +14,7 @@ internal sealed class NeuralNetworkTrainerService : INeuralNetworkTrainerService
                                                  Func<double, double> activationDerivative,
                                                  CancellationToken cancellationToken = default)
     {
-        BackPropagationNeuralNetwork network = new(initialWeights);
+        BackPropagationNeuralNetwork network = new(initialWeights, options.UseGpu);
 
         network.SetActivationFunction(activation, activationDerivative);
 

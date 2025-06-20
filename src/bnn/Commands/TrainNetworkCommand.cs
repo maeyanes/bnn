@@ -43,7 +43,6 @@ internal static class TrainNetworkCommand
                       {
                           IsRequired = false
                       });
-        cmd.AddOption(new Option<bool>("--useGpu", "Use GPU acceleration for training if available."));
 
         Option<string> activationOption = new(["--activation", "-a"],
                                               "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")
@@ -55,9 +54,9 @@ internal static class TrainNetworkCommand
                                       {
                                           string? value = result.GetValueOrDefault<string>()?.ToLowerInvariant();
 
-                                          if (value is not ("sigmoid" or "relu" or "tanh"))
+                                          if (value is not ("sigmoid" or "relu" or "tanh" or "signedroot" or "cuberoot"))
                                           {
-                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh.";
+                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh, signedRoot, cubeRoot.";
                                           }
                                       });
 
@@ -71,6 +70,7 @@ internal static class TrainNetworkCommand
                       {
                           IsRequired = false
                       });
+        cmd.AddOption(new Option<bool>("--useGpu", "Use GPU acceleration for training if available."));
 
         cmd.Handler = CommandHandler.Create<TrainOptions, IHost>(Run);
 
@@ -188,6 +188,9 @@ internal static class TrainNetworkCommand
                                                                                                "sigmoid" => ActivationFunctions.Sigmoid,
                                                                                                "relu" => ActivationFunctions.ReLu,
                                                                                                "tanh" => ActivationFunctions.Tanh,
+                                                                                               "cuberoot" => ActivationFunctions.CubeRoot,
+                                                                                               "signedroot" => ActivationFunctions
+                                                                                                   .SignedRoot,
                                                                                                { } unknown =>
                                                                                                    throw new
                                                                                                        ArgumentException($"Unsupported activation function: {unknown}")

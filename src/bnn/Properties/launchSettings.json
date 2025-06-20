@@ -2,7 +2,7 @@
   "profiles": {
     "bnn": {
       "commandName": "Project",
-      "commandLineArgs": "predict -d ..\\..\\..\\data\\four\\input.txt -w ..\\..\\..\\data\\four\\W000015-1260-0.txt -o ..\\..\\..\\data\\four\\result.txt"
+      "commandLineArgs": "train-network -d \"C:\\Users\\maeya\\source\\repos\\bnn\\data\\four\\four.txt\" -h 5 -e 5000 -l 0.05 --outputPrefix testing- -a cubeRoot -s 948 --useGpu"
     }
   }
 }
