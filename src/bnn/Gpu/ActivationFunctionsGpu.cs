@@ -50,10 +50,8 @@ public static class ActivationFunctionsGpu
         }
     }
 
-    public static float[] Derivative(float[] outputs, ActivationKind kind)
+    public static void Derivative(ReadOnlyBuffer<float> outputs, ReadWriteBuffer<float> derivativeBuffer, ActivationKind kind)
     {
-        using ReadOnlyBuffer<float> outputBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(outputs);
-        using ReadWriteBuffer<float> derivativeBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<float>(outputs.Length);
         GraphicsDevice device = GraphicsDevice.GetDefault();
 
         switch (kind)
@@ -74,6 +72,15 @@ public static class ActivationFunctionsGpu
                 device.For(outputs.Length, new CubeRootDerivativeKernel(outputBuffer, derivativeBuffer));
                 break;
         }
+
+    }
+
+    public static float[] Derivative(float[] outputs, ActivationKind kind)
+    {
+        using ReadOnlyBuffer<float> outputBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(outputs);
+        using ReadWriteBuffer<float> derivativeBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<float>(outputs.Length);
+
+        Derivative(outputBuffer, derivativeBuffer, kind);
 
         return derivativeBuffer.ToArray();
     }

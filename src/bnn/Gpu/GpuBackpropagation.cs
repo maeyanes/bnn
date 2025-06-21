@@ -34,88 +34,69 @@ public static class GpuBackpropagation
         return Array.ConvertAll(output, x => (double)x);
     }
 
-    public static void ComputeInitialErrorsGpu(double[,] finalCluster,
-                                               double[] finalErrors,
-                                               double[] hiddenLayer,
-                                               double[] initialErrors,
-                                               double[] outputLayer,
-                                               double trainingRate,
+    public static void CalculateLayerOutputGpu(ReadWriteBuffer<float> input,
+                                               ReadWriteBuffer<float> weights,
+                                               ReadWriteBuffer<float> output,
+                                               int inputSize,
+                                               int stride,
                                                ActivationKind activation)
     {
-        int hidden = hiddenLayer.Length;
-        int outputs = finalErrors.Length;
+        GraphicsDevice.GetDefault().For(output.Length,
+                                        new KernelRw(input,
+                                                     weights,
+                                                     output,
+                                                     inputSize,
+                                                     stride));
 
-        float[] clusterData = finalCluster.Cast<double>().Select(x => (float)x).ToArray();
-        float[] finalErrorsData = Array.ConvertAll(finalErrors, x => (float)x);
-        float[] hiddenDerivatives = ActivationFunctionsGpu.Derivative(Array.ConvertAll(hiddenLayer, x => (float)x), activation);
-        float[] outputDerivatives = ActivationFunctionsGpu.Derivative(Array.ConvertAll(outputLayer, x => (float)x), activation);
-
-        using ReadOnlyBuffer<float> clusterBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(clusterData);
-        using ReadWriteBuffer<float> finalErrorsBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(finalErrorsData);
-        using ReadOnlyBuffer<float> hiddenDerBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(hiddenDerivatives);
-        using ReadWriteBuffer<float> initialErrorsBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<float>(hidden);
-
-        int stride = finalCluster.GetLength(1);
-
-        GraphicsDevice.GetDefault().For(hidden,
-                                        new InitialErrorsKernel(clusterBuffer,
-                                                               finalErrorsBuffer,
-                                                               hiddenDerBuffer,
-                                                               initialErrorsBuffer,
-                                                               (float)trainingRate,
-                                                               outputs,
-                                                               stride));
-
-        using ReadOnlyBuffer<float> outputDerBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(outputDerivatives);
-
-        GraphicsDevice.GetDefault().For(outputs,
-                                        new FinalErrorsKernel(finalErrorsBuffer,
-                                                              outputDerBuffer,
-                                                              (float)trainingRate));
-
-        float[] initialGpu = initialErrorsBuffer.ToArray();
-        float[] finalGpu = finalErrorsBuffer.ToArray();
-
-        for (int i = 0; i < hidden; i++)
-        {
-            initialErrors[i] = initialGpu[i];
-        }
-
-        for (int i = 0; i < outputs; i++)
-        {
-            finalErrors[i] = finalGpu[i];
-        }
+        ActivationFunctionsGpu.ApplyActivation(output, output.Length, activation);
     }
 
-    public static void UpdateWeightsGpu(double[,] cluster, double[] inputs, double[] errors)
+    public static void ComputeInitialErrorsGpu(ReadWriteBuffer<float> finalCluster,
+                                               ReadWriteBuffer<float> finalErrors,
+                                               ReadWriteBuffer<float> hiddenLayer,
+                                               ReadWriteBuffer<float> initialErrors,
+                                               ReadWriteBuffer<float> outputLayer,
+                                               float trainingRate,
+                                               ActivationKind activation,
+                                               int outputs,
+                                               int stride)
     {
-        int rows = cluster.GetLength(0);
-        int cols = cluster.GetLength(1);
+        int hidden = hiddenLayer.Length;
 
-        float[] clusterData = cluster.Cast<double>().Select(x => (float)x).ToArray();
-        float[] inputData = Array.ConvertAll(inputs, x => (float)x);
-        float[] errorData = Array.ConvertAll(errors, x => (float)x);
+        using ReadWriteBuffer<float> hiddenDerBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<float>(hidden);
+        using ReadWriteBuffer<float> outputDerBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer<float>(outputs);
 
-        using ReadWriteBuffer<float> clusterBuffer = GraphicsDevice.GetDefault().AllocateReadWriteBuffer(clusterData);
-        using ReadOnlyBuffer<float> inputBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(inputData);
-        using ReadOnlyBuffer<float> errorBuffer = GraphicsDevice.GetDefault().AllocateReadOnlyBuffer(errorData);
+        ActivationFunctionsGpu.Derivative(hiddenLayer, hiddenDerBuffer, activation);
+        ActivationFunctionsGpu.Derivative(outputLayer, outputDerBuffer, activation);
+
+        GraphicsDevice.GetDefault().For(hidden,
+                                        new InitialErrorsKernelRw(finalCluster,
+                                                                 finalErrors,
+                                                                 hiddenDerBuffer,
+                                                                 initialErrors,
+                                                                 (float)trainingRate,
+                                                                 outputs,
+                                                                 stride));
+
+        GraphicsDevice.GetDefault().For(outputs,
+                                        new FinalErrorsKernel(finalErrors,
+                                                              outputDerBuffer,
+                                                              (float)trainingRate));
+    }
+
+    public static void UpdateWeightsGpu(ReadWriteBuffer<float> cluster,
+                                        ReadWriteBuffer<float> inputs,
+                                        ReadWriteBuffer<float> errors,
+                                        int inputSize,
+                                        int stride)
+    {
+        int rows = errors.Length;
 
         GraphicsDevice.GetDefault().For(rows,
-                                        new UpdateWeightsKernel(clusterBuffer,
-                                                               inputBuffer,
-                                                               errorBuffer,
-                                                               cols - 1,
-                                                               cols));
-
-        float[] updated = clusterBuffer.ToArray();
-        int index = 0;
-
-        for (int r = 0; r < rows; r++)
-        {
-            for (int c = 0; c < cols; c++)
-            {
-                cluster[r, c] = updated[index++];
-            }
-        }
+                                        new UpdateWeightsKernelRw(cluster,
+                                                                 inputs,
+                                                                 errors,
+                                                                 inputSize,
+                                                                 stride));
     }
 }

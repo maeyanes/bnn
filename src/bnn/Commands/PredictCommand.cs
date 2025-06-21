@@ -5,6 +5,7 @@ using bnn.Activation;
 using bnn.Data;
 using bnn.Extensions;
 using bnn.Gpu;
+using bnn;
 using bnn.Options;
 using bnn.Serialization;
 using bnn.Utils;
@@ -121,7 +122,9 @@ public static class PredictCommand
 
             Weights weights = WeightsSerializer.DeserializeFromFile(options.WeightsFile);
 
-            BackPropagationNeuralNetwork network = new(weights, options.UseGpu);
+            IBackPropagationNeuralNetwork network = options.UseGpu
+                ? new BackPropagationNeuralNetworkGpu(weights)
+                : new BackPropagationNeuralNetwork(weights);
 
             (Func<double, double> activation, Func<double, double> activationDerivative) = options.Activation.ToLowerInvariant() switch
            {
