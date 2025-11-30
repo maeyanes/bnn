@@ -1,15 +1,17 @@
-﻿namespace bnn.Activation;
+namespace bnn.Activation;
 
 public static class ActivationFunctions
 {
-    public static readonly (Func<double, double> f, Func<double, double> df) ReLu = (x => Math.Max(0.0, x),
-                                                                                     y => y > 0.0 ? 1.0 : 0.0 // y = ReLU(x)
-                                                                                    );
+    public static readonly (Func<double, double> f, Func<double, double> df) ReLu = (x => Math.Max(0.0, x), y => y > 0.0 ? 1.0 : 0.0);
 
-    public static readonly (Func<double, double> f, Func<double, double> df) Sigmoid = (x => 1.0 / (1.0 + Math.Exp(-x)),
-                                                                                        y => y * (1.0 - y) // y = sigmoid(x)
-                                                                                       );
+    public static readonly (Func<double, double> f, Func<double, double> df)
+        Sigmoid = (x => 1.0 / (1.0 + Math.Exp(-x)), y => y * (1.0 - y));
 
-    public static readonly (Func<double, double> f, Func<double, double> df) Tanh = (Math.Tanh, y => 1.0 - y * y // y = tanh(x)
-                                                                                    );
+    public static readonly (Func<double, double> f, Func<double, double> df) SigmoidPlus = (x => 2.0 / (1.0 + Math.Exp(-x)) - 1.0,
+                                                                                            y => (1.0 - y * y) / 2.0);
+
+    public static readonly (Func<double, double> f, Func<double, double> df) Tanh = (Math.Tanh, y => 1.0 - y * y);
+
+    public static readonly (Func<double, double> f, Func<double, double> df) TanhPlus = (x => (Math.Tanh(x) + 1.0) / 2.0,
+                                                                                         y => 2.0 * y * (1.0 - y));
 }

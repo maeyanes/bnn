@@ -1,5 +1,6 @@
-﻿using System.CommandLine;
+using System.CommandLine;
 using System.CommandLine.NamingConventionBinder;
+using System.Diagnostics;
 using bnn.Activation;
 using bnn.Data;
 using bnn.Options;
@@ -45,7 +46,7 @@ internal static class TrainNetworkCommand
                       });
 
         Option<string> activationOption = new(["--activation", "-a"],
-                                              "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")
+                                              "Activation function to use: sigmoid, relu, tanh, sigmoidPlus or tanhPlus (default: sigmoid)")
                                           {
                                               IsRequired = false
                                           };
@@ -54,9 +55,10 @@ internal static class TrainNetworkCommand
                                       {
                                           string? value = result.GetValueOrDefault<string>()?.ToLowerInvariant();
 
-                                          if (value is not ("sigmoid" or "relu" or "tanh"))
+                                          if (value is not ("sigmoid" or "relu" or "tanh" or "sigmoidplus" or "tanhplus"))
                                           {
-                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh.";
+                                              result.ErrorMessage =
+                                                  "Activation must be one of: sigmoid, relu, tanh, sigmoidPlus, tanhPlus.";
                                           }
                                       });
 
@@ -187,6 +189,9 @@ internal static class TrainNetworkCommand
                                                                                                "sigmoid" => ActivationFunctions.Sigmoid,
                                                                                                "relu" => ActivationFunctions.ReLu,
                                                                                                "tanh" => ActivationFunctions.Tanh,
+                                                                                               "sigmoidplus" => ActivationFunctions
+                                                                                                   .SigmoidPlus,
+                                                                                               "tanhplus" => ActivationFunctions.TanhPlus,
                                                                                                { } unknown =>
                                                                                                    throw new
                                                                                                        ArgumentException($"Unsupported activation function: {unknown}")
@@ -194,23 +199,29 @@ internal static class TrainNetworkCommand
 
             INeuralNetworkTrainerService trainer = host.Services.GetRequiredService<INeuralNetworkTrainerService>();
 
+            Stopwatch sw = Stopwatch.StartNew();
+
             TrainingReport trainingReport = await trainer.TrainAsync(options,
                                                                      trainingData,
                                                                      initialWeights,
                                                                      activation,
                                                                      activationDerivative);
 
+            sw.Stop();
+
             Console.WriteLine();
 
             if (trainingReport.EpochZeroErrors.HasValue)
             {
-                ConsoleOutput.PrintSuccess($"Network trained successfully in {trainingReport.EpochZeroErrors:N0} epochs.");
+                ConsoleOutput
+                    .PrintSuccess($"Network trained successfully in {trainingReport.EpochZeroErrors:N0} epochs with a duration of {sw.Elapsed.TotalSeconds} seconds.");
             }
             else
             {
-                await ConsoleOutput
-                    .PrintErrorAsync($"Network training completed after {trainingReport.EpochsExecuted:N0} epochs with {trainingReport.MinErrors} errors.",
-                                     false);
+                await
+                    ConsoleOutput
+                        .PrintErrorAsync($"Network training completed after {trainingReport.EpochsExecuted:N0} epochs with {trainingReport.MinErrors} errors and a duration of {sw.Elapsed.TotalSeconds} seconds.",
+                                         false);
             }
         }
         catch (Exception ex)

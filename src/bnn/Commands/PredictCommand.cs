@@ -1,4 +1,4 @@
-﻿using System.CommandLine;
+using System.CommandLine;
 using System.CommandLine.NamingConventionBinder;
 using System.Text;
 using bnn.Activation;
@@ -33,7 +33,7 @@ public static class PredictCommand
                                        "If enabled, predicted output values will be binarized using a fixed threshold of 0.5. Outputs >= 0.5 will be set to 1, otherwise 0."));
 
         Option<string> activationOption = new(["--activation", "-a"],
-                                              "Activation function to use: sigmoid, relu, or tanh (default: sigmoid)")
+                                              "Activation function to use: sigmoid, relu, tanh, sigmoidPlus or tanhPlus (default: sigmoid)")
                                           {
                                               IsRequired = false
                                           };
@@ -43,9 +43,10 @@ public static class PredictCommand
                                       {
                                           string? value = result.GetValueOrDefault<string>()?.ToLowerInvariant();
 
-                                          if (value is not ("sigmoid" or "relu" or "tanh"))
+                                          if (value is not ("sigmoid" or "relu" or "tanh" or "sigmoidplus" or "tanhplus"))
                                           {
-                                              result.ErrorMessage = "Activation must be one of: sigmoid, relu, tanh.";
+                                              result.ErrorMessage =
+                                                  "Activation must be one of: sigmoid, relu, tanh, sigmoidPlus, tanhPlus.";
                                           }
                                       });
 
@@ -125,6 +126,9 @@ public static class PredictCommand
                                                                                                "sigmoid" => ActivationFunctions.Sigmoid,
                                                                                                "relu" => ActivationFunctions.ReLu,
                                                                                                "tanh" => ActivationFunctions.Tanh,
+                                                                                               "sigmoidplus" => ActivationFunctions
+                                                                                                   .SigmoidPlus,
+                                                                                               "tanhplus" => ActivationFunctions.TanhPlus,
                                                                                                { } unknown =>
                                                                                                    throw new
                                                                                                        ArgumentException($"Unsupported activation function: {unknown}")
@@ -133,7 +137,7 @@ public static class PredictCommand
             network.SetActivationFunction(activation, activationDerivative);
 
             Console.WriteLine();
-            ConsoleOutput.PrintInfo("Generating predictions...");
+            ConsoleOutput.PrintInfo($"Generating predictions with {options.Activation} activation...");
             Console.WriteLine();
 
             bool saveOutputs = options.OutputFile is not null;
